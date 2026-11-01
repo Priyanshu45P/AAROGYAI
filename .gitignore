@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.joblib
+*.pkl
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

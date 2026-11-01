@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CLINICIAN
+  PATIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum AppointmentStatus {
+  REQUESTED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum CarePlanStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  HIGH
+}
+
+enum CombDimension {
+  CAPABILITY
+  OPPORTUNITY
+  MOTIVATION
+}
+
+model User {
+  id               String            @id @default(cuid())
+  firstName        String
+  lastName         String
+  email            String            @unique
+  passwordHash     String
+  role             UserRole
+  status           UserStatus        @default(ACTIVE)
+  patientProfile   PatientProfile?
+  clinicianProfile ClinicianProfile?
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model PatientProfile {
+  id                     String                       @id @default(cuid())
+  userId                 String                       @unique
+  user                   User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth            DateTime?
+  sex                    String?
+  phone                  String?
+  address                String?
+  heightCm               Float?
+  clinicalReadings       ClinicalReading[]
+  medicalRecords         MedicalRecord[]
+  conditions             Condition[]
+  medications            Medication[]
+  allergies              Allergy[]
+  familyHistories        FamilyHistory[]
+  clinicianAssignments   ClinicianPatientAssignment[]
+  appointments           Appointment[]
+  behaviourAssessments   BehaviourAssessment[]
+  riskPredictions        RiskPrediction[]
+  recommendations        Recommendation[]
+  carePlans              CarePlan[]
+  goals                  CarePlanGoal[]
+  clinicalNotes          ClinicalNote[]
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+}
+
+model ClinicianProfile {
+  id                 String                       @id @default(cuid())
+  userId             String                       @unique
+  user               User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registrationNumber String?
+  speciality         String?
+  phone              String?
+  appointments       Appointment[]
+  carePlans          CarePlan[]
+  clinicalNotes      ClinicalNote[]
+  patientAssignments ClinicianPatientAssignment[]
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+}
+
+model ClinicalReading {
+  id          String         @id @default(cuid())
+  patientId   String
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  glucose     Float?
+  systolicBP  Float?
+  diastolicBP Float?
+  hba1c       Float?
+  weightKg    Float?
+  heightCm    Float?
+  bmi         Float?
+  notes       String?
+  recordedAt  DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+
+  @@index([patientId])
+  @@index([recordedAt])
+}
+
+model MedicalRecord {
+  id          String         @id @default(cuid())
+  patientId   String
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  recordedAt  DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+
+  @@index([patientId])
+}
+
+model Condition {
+  id          String         @id @default(cuid())
+  patientId   String
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  diagnosedAt DateTime?
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+
+  @@index([patientId])
+}
+
+model Medication {
+  id        String         @id @default(cuid())
+  patientId String
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name      String
+  dosage    String?
+  frequency String?
+  startDate DateTime?
+  endDate   DateTime?
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+
+  @@index([patientId])
+}
+
+model Allergy {
+  id        String         @id @default(cuid())
+  patientId String
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  allergen  String
+  reaction  String?
+  severity  String?
+  createdAt DateTime       @default(now())
+
+  @@index([patientId])
+}
+
+model FamilyHistory {
+  id           String         @id @default(cuid())
+  patientId    String
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  relationship String
+  condition    String
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([patientId])
+}
+
+model ClinicianPatientAssignment {
+  id          String           @id @default(cuid())
+  clinicianId String
+  clinician   ClinicianProfile @relation(fields: [clinicianId], references: [id], onDelete: Cascade)
+  patientId   String
+  patient     PatientProfile   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  active      Boolean          @default(true)
+  assignedAt  DateTime         @default(now())
+  endedAt     DateTime?
+
+  @@unique([clinicianId, patientId])
+  @@index([clinicianId, active])
+  @@index([patientId, active])
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  patientId       String
+  patient         PatientProfile    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  clinicianId     String
+  clinician       ClinicianProfile  @relation(fields: [clinicianId], references: [id], onDelete: Cascade)
+  appointmentDate DateTime
+  reason          String
+  notes           String?
+  status          AppointmentStatus @default(REQUESTED)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([patientId])
+  @@index([clinicianId])
+}
+
+model BehaviourQuestion {
+  id           String              @id @default(cuid())
+  text         String
+  dimension    CombDimension
+  subDimension String?
+  active       Boolean             @default(true)
+  responses    BehaviourResponse[]
+  createdAt    DateTime            @default(now())
+}
+
+model BehaviourAssessment {
+  id               String              @id @default(cuid())
+  patientId        String
+  patient          PatientProfile      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  capabilityScore  Float
+  opportunityScore Float
+  motivationScore  Float
+  overallScore     Float?
+  responses        BehaviourResponse[]
+  completedAt      DateTime            @default(now())
+
+  @@index([patientId])
+}
+
+model BehaviourResponse {
+  id           String              @id @default(cuid())
+  assessmentId String
+  assessment   BehaviourAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     BehaviourQuestion   @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answer       Int
+  createdAt    DateTime            @default(now())
+
+  @@index([assessmentId])
+  @@index([questionId])
+}
+
+model RiskPrediction {
+  id                   String                          @id @default(cuid())
+  patientId            String
+  patient              PatientProfile                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  riskType             String
+  riskLevel            RiskLevel
+  probability          Float
+  modelName            String
+  modelVersion         String
+  inputSnapshot        Json
+  featureContributions PredictionFeatureContribution[]
+  createdAt            DateTime                        @default(now())
+
+  @@index([patientId])
+}
+
+model PredictionFeatureContribution {
+  id             String         @id @default(cuid())
+  predictionId   String
+  prediction     RiskPrediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  featureName    String
+  featureValue   String?
+  shapValue      Float
+  importanceRank Int?
+
+  @@index([predictionId])
+}
+
+model Recommendation {
+  id               String         @id @default(cuid())
+  patientId        String
+  patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  category         String
+  title            String
+  message          String
+  approved         Boolean        @default(false)
+  approvedAt       DateTime?
+  approvedByUserId String?
+  createdAt        DateTime       @default(now())
+
+  @@index([patientId])
+}
+
+model CarePlan {
+  id              String           @id @default(cuid())
+  patientId       String
+  patient         PatientProfile   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  clinicianId     String
+  clinician       ClinicianProfile @relation(fields: [clinicianId], references: [id], onDelete: Restrict)
+  title           String
+  clinicalGoal    String?
+  patientGoal     String?
+  recommendation  String?
+  clinicianNotes  String?
+  startDate       DateTime
+  reviewDate      DateTime?
+  status          CarePlanStatus   @default(ACTIVE)
+  goals           CarePlanGoal[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model CarePlanGoal {
+  id          String         @id @default(cuid())
+  patientId   String
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  carePlanId  String
+  carePlan    CarePlan       @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  progress    Int            @default(0)
+  status      GoalStatus     @default(NOT_STARTED)
+  startDate   DateTime?
+  reviewDate  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model ClinicalNote {
+  id          String           @id @default(cuid())
+  patientId   String
+  patient     PatientProfile   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  clinicianId String
+  clinician   ClinicianProfile @relation(fields: [clinicianId], references: [id], onDelete: Restrict)
+  note        String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
